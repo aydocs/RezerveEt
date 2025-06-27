@@ -8,7 +8,7 @@
     }
   },
   "env": {
-    "MONGODB_URI": "@mongodb-uri",
+    "MONGODB_URI": "mongodb+srv://rezerveet:rezerveet@rezerveet.ws3rfc9.mongodb.net/rezerveet?retryWrites=true&w=majority&appName=RezerveEt",
     "JWT_SECRET": "@jwt-secret",
     "NEXTAUTH_SECRET": "@nextauth-secret",
     "SMTP_USER": "@smtp-user",
