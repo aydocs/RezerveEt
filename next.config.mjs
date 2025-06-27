@@ -51,9 +51,8 @@ const nextConfig = {
       },
     ]
   },
-  experimental: {
-    serverComponentsExternalPackages: ['mongoose', 'nodemailer'],
-  },
+  // Burada eski "experimental" kaldırıldı, yeni config eklendi:
+  serverExternalPackages: ['mongoose', 'nodemailer'],
 }
 
 export default nextConfig
