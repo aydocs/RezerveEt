@@ -1,20 +1,26 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'web App',
-  description: 'Created with web',
+  title: 'Rezerve Et - Online Rezervasyon Sistemi',
+  description: 'Restoran, kafe, etkinlik ve hizmetler için hızlı ve kolay online rezervasyon yapın.',
   generator: 'Aydocs',
+  keywords: ['rezervasyon', 'online rezervasyon', 'masa ayırt', 'rezerve et', 'restoran rezervasyon'],
+  authors: [{ name: 'Aydocs', url: 'https://github.com/aydocs' }],
+  creator: 'Aydocs',
+  // viewport alanı metadata içinde değil, ayrı export olarak:
+};
+
+export function generateViewport() {
+  return 'width=device-width, initial-scale=1.0';
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <body>{children}</body>
     </html>
-  )
+  );
 }

@@ -9,7 +9,7 @@ export const config = {
   // Database Configuration
   database: {
     uri: process.env.MONGODB_URI || "",
-    name: process.env.MONGODB_DB_NAME || "rezerveet",
+    name: process.env.MONGODB_DB || "rezerveet",
   },
 
   // Authentication Configuration
