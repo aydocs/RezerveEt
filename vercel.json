@@ -9,15 +9,58 @@
   },
   "env": {
     "MONGODB_URI": "mongodb+srv://rezerveet:rezerveet@rezerveet.ws3rfc9.mongodb.net/rezerveet?retryWrites=true&w=majority&appName=RezerveEt",
-    "JWT_SECRET": "@jwt-secret",
-    "NEXTAUTH_SECRET": "@nextauth-secret",
-    "SMTP_USER": "@smtp-user",
-    "SMTP_PASS": "@smtp-pass",
-    "CLOUDINARY_CLOUD_NAME": "@cloudinary-cloud-name",
-    "CLOUDINARY_API_KEY": "@cloudinary-api-key",
-    "CLOUDINARY_API_SECRET": "@cloudinary-api-secret",
-    "UPSTASH_REDIS_REST_URL": "@upstash-redis-url",
-    "UPSTASH_REDIS_REST_TOKEN": "@upstash-redis-token"
+    "MONGODB_DB": "rezerveet",
+
+    "JWT_SECRET": "Ahj32jhsda8723ydas8dhasd823hdas8dhas",
+    "NEXTAUTH_SECRET": "Ahj32jhsda8723ydas8dhasd823hdas8dhas",
+    "NEXTAUTH_URL": "http://localhost:3000",
+
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "587",
+    "SMTP_USER": "patakanefe@gmail.com",
+    "SMTP_PASS": "wdht mbgb ohgv bfyf",
+    "SMTP_FROM": "noreply@rezerveet.com",
+
+    "IYZICO_API_KEY": "sandbox-your-api-key",
+    "IYZICO_SECRET_KEY": "sandbox-your-secret-key",
+
+    "TWILIO_ACCOUNT_SID": "your-twilio-account-sid",
+    "TWILIO_AUTH_TOKEN": "your-twilio-auth-token",
+    "TWILIO_PHONE_NUMBER": "+1234567890",
+
+    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_APP_NAME": "RezerveEt",
+    "NODE_ENV": "development",
+
+    "ADMIN_EMAIL": "admin@rezerveet.com",
+    "ADMIN_PASSWORD": "admin123456",
+
+    "CLOUDINARY_CLOUD_NAME": "ds7rlzkxr",
+    "CLOUDINARY_API_KEY": "168495488645658",
+    "CLOUDINARY_API_SECRET": "XJ5RPNZwU9SRwkYOj9RBUGM_elU",
+
+    "GOOGLE_MAPS_API_KEY": "your-google-maps-api-key",
+    "GOOGLE_CLIENT_ID": "your-google-oauth-client-id",
+    "GOOGLE_CLIENT_SECRET": "your-google-oauth-client-secret",
+
+    "REDIS_URL": "redis://default:AWniAAIjcDE5MDYzYmFjNTVlZGQ0OWM3YWQ2ZGI3N2FhZjQ2Y2ViMnAxMA@absolute-cockatoo-27106.upstash.io:6379",
+    "UPSTASH_REDIS_REST_URL": "https://absolute-cockatoo-27106.upstash.io",
+    "UPSTASH_REDIS_REST_TOKEN": "AWniAAIjcDE5MDYzYmFjNTVlZGQ0OWM3YWQ2ZGI3N2FhZjQ2Y2ViMnAxMA",
+
+    "GOOGLE_ANALYTICS_ID": "G-XXXXXXXXXX",
+    "FACEBOOK_PIXEL_ID": "123456789",
+
+    "ENCRYPTION_KEY": "hjbGT673gdhHJS8sjsad8912ksadLL32",
+    "RATE_LIMIT_MAX": "100",
+    "RATE_LIMIT_WINDOW": "900000",
+
+    "PUSH_PUBLIC_KEY": "BEbx9NQue1Tt0GPtkUF_MPzJVFtRh_rHmswFNeXCykZpcwlGS7QuxJ8ZSelFi-xuz2xSpGBMPwAsZw0ahbIqNkI",
+    "PUSH_PRIVATE_KEY": "jaw3VX2p5pli3VbN48sNg_hlTX47C6EFmFAXyBE3nMw",
+    "PUSH_NOTIFICATION_KEY": "your-push-notification-key",
+    "FIREBASE_SERVER_KEY": "your-firebase-server-key",
+
+    "BACKUP_SCHEDULE": "0 2 * * *",
+    "BACKUP_RETENTION_DAYS": "30"
   },
   "headers": [
     {
