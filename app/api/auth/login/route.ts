@@ -1,142 +1,145 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { SignJWT } from "jose";
-import bcrypt from "bcryptjs";
-import { connectToDatabase } from "@/lib/database";
+import { MongoClient, type Db, type Collection } from "mongodb";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+let client: MongoClient | null = null;
+let db: Db | null = null;
 
-if (!JWT_SECRET) throw new Error("JWT_SECRET env değişkeni tanımlı değil!");
-if (!ADMIN_EMAIL) throw new Error("ADMIN_EMAIL env değişkeni tanımlı değil!");
-if (!ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD env değişkeni tanımlı değil!");
+const uri = process.env.MONGODB_URI;
+const dbName = process.env.MONGODB_DB;
 
-const secret = new TextEncoder().encode(JWT_SECRET);
+if (!uri) {
+  throw new Error("❌ MONGODB_URI environment variable is not set.");
+}
 
-export async function POST(request: NextRequest) {
+if (!dbName) {
+  throw new Error("❌ MONGODB_DB environment variable is not set.");
+}
+
+// MongoDB bağlantısı oluştur
+export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
+  if (client && db) return { client, db };
+
   try {
-    const { email: rawEmail, password, rememberMe = false } = await request.json();
+    client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
 
-    if (!rawEmail || !password) {
-      return NextResponse.json(
-        { success: false, error: "E-posta ve şifre gereklidir." },
-        { status: 400 }
-      );
-    }
+    await client.connect();
+    db = client.db(dbName);
+    console.log("✅ MongoDB bağlantısı kuruldu.");
+    return { client, db };
+  } catch (err) {
+    console.error("❌ MongoDB bağlantı hatası:", err);
+    throw new Error("MongoDB bağlantı hatası.");
+  }
+}
 
-    const email = rawEmail.toLowerCase();
+// Bağlantıyı kapat
+export async function closeDatabaseConnection() {
+  if (client) {
+    await client.close();
+    client = null;
+    db = null;
+    console.log("🔌 MongoDB bağlantısı kapatıldı.");
+  }
+}
 
-    // --- Admin Girişi ---
-    if (email === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
-      const token = await new SignJWT({
-        userId: "1",
-        email,
-        role: "admin",
-        businessId: null,
-      })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime(rememberMe ? "30d" : "1d")
-        .sign(secret);
+// Belirli bir koleksiyonu al
+export async function getCollection<T = any>(collectionName: string): Promise<Collection<T>> {
+  const { db } = await connectToDatabase();
+  return db.collection<T>(collectionName);
+}
 
-      const response = NextResponse.json({
-        success: true,
-        message: "Admin girişi başarılı.",
-        user: {
-          id: "1",
-          firstName: "Admin",
-          lastName: "User",
-          email,
-          role: "admin",
-          businessId: null,
-        },
-      });
+// CRUD servis sınıfı
+export class DatabaseService {
+  static async findOne<T>(collectionName: string, filter: any): Promise<T | null> {
+    const collection = await getCollection<T>(collectionName);
+    return collection.findOne(filter);
+  }
 
-      response.cookies.set("auth-token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60, // saniye
-        path: "/",
-      });
+  static async findMany<T>(collectionName: string, filter: any = {}, options: any = {}): Promise<T[]> {
+    const collection = await getCollection<T>(collectionName);
+    return collection.find(filter, options).toArray();
+  }
 
-      return response;
-    }
+  static async insertOne<T>(collectionName: string, document: T): Promise<any> {
+    const collection = await getCollection<T>(collectionName);
+    return collection.insertOne(document as any);
+  }
 
-    // --- Kullanıcı Girişi ---
+  static async updateOne<T>(collectionName: string, filter: any, update: any): Promise<any> {
+    const collection = await getCollection<T>(collectionName);
+    return collection.updateOne(filter, { $set: update });
+  }
+
+  static async deleteOne(collectionName: string, filter: any): Promise<any> {
+    const collection = await getCollection(collectionName);
+    return collection.deleteOne(filter);
+  }
+
+  static async count(collectionName: string, filter: any = {}): Promise<number> {
+    const collection = await getCollection(collectionName);
+    return collection.countDocuments(filter);
+  }
+}
+
+// Gerekli indexleri oluştur
+export async function createIndexes() {
+  try {
     const { db } = await connectToDatabase();
 
-    // Kullanıcıyı email ile bul
-    const user = await db.collection("users").findOne({ email });
+    // Users
+    await db.collection("users").createIndex({ email: 1 }, { unique: true });
+    await db.collection("users").createIndex({ phone: 1 });
+    await db.collection("users").createIndex({ role: 1 });
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre." },
-        { status: 401 }
-      );
-    }
+    // Businesses
+    await db.collection("businesses").createIndex({ slug: 1 }, { unique: true });
+    await db.collection("businesses").createIndex({ category: 1 });
+    await db.collection("businesses").createIndex({ city: 1 });
+    await db.collection("businesses").createIndex({ location: "2dsphere" });
+    await db.collection("businesses").createIndex({ rating: -1 });
+    await db.collection("businesses").createIndex({ isActive: 1 });
 
-    // Şifre kontrolü
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    // Reservations
+    await db.collection("reservations").createIndex({ businessId: 1 });
+    await db.collection("reservations").createIndex({ userId: 1 });
+    await db.collection("reservations").createIndex({ date: 1, time: 1 });
+    await db.collection("reservations").createIndex({ status: 1 });
+    await db.collection("reservations").createIndex({ createdAt: -1 });
 
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre." },
-        { status: 401 }
-      );
-    }
+    // Reviews
+    await db.collection("reviews").createIndex({ businessId: 1 });
+    await db.collection("reviews").createIndex({ userId: 1 });
+    await db.collection("reviews").createIndex({ rating: 1 });
+    await db.collection("reviews").createIndex({ createdAt: -1 });
 
-    // Hesap aktif mi?
-    if (!user.isActive) {
-      return NextResponse.json(
-        { success: false, error: "Hesabınız askıya alınmıştır." },
-        { status: 403 }
-      );
-    }
-
-    // JWT oluştur
-    const token = await new SignJWT({
-      userId: user._id.toString(),
-      email: user.email,
-      role: user.role,
-      businessId: user.businessId ?? null,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime(rememberMe ? "30d" : "1d")
-      .sign(secret);
-
-    const response = NextResponse.json({
-      success: true,
-      message: "Giriş başarılı.",
-      user: {
-        id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        businessId: user.businessId ?? null,
-      },
-    });
-
-    // HttpOnly cookie olarak tokenı ayarla
-    response.cookies.set("auth-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
-      path: "/",
-    });
-
-    return response;
-  } catch (error: any) {
-    console.error("Login error:", error?.message || error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin.",
-      },
-      { status: 500 }
-    );
+    console.log("✅ Veritabanı indeksleri başarıyla oluşturuldu.");
+  } catch (err) {
+    console.error("❌ İndeks oluşturma hatası:", err);
   }
+}
+
+// Geliştirilmeye açık placeholder fonksiyonlar
+export async function findBusinesses(filters: {
+  category?: string;
+  city?: string;
+  search?: string;
+  location?: { lat: number; lng: number; radius: number };
+  rating?: number;
+  priceRange?: string[];
+  limit?: number;
+  offset?: number;
+}): Promise<any[]> {
+  // TODO: Filtreye göre işletme bul
+  return [];
+}
+
+export async function createReservation(reservationData: Partial<any>) {
+  // TODO: Rezervasyon oluşturma ve çakışma kontrolü
+}
+
+export async function updateBusinessRating(businessId: string) {
+  // TODO: Ortalama puanı yeniden hesapla ve işletmeye kaydet
 }
