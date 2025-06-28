@@ -3,27 +3,34 @@ import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/database";
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret");
+const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!JWT_SECRET) throw new Error("JWT_SECRET env değişkeni tanımlı değil!");
+if (!ADMIN_EMAIL) throw new Error("ADMIN_EMAIL env değişkeni tanımlı değil!");
+if (!ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD env değişkeni tanımlı değil!");
+
+const secret = new TextEncoder().encode(JWT_SECRET);
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, rememberMe } = await request.json();
+    const { email: rawEmail, password, rememberMe = false } = await request.json();
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return NextResponse.json(
-        { success: false, error: "E-posta ve şifre gereklidir" },
+        { success: false, error: "E-posta ve şifre gereklidir." },
         { status: 400 }
       );
     }
 
-    // Admin kullanıcı kontrolü (env değişkenleri kontrolü ekleyebilirsin)
-    if (
-      email.toLowerCase() === (process.env.ADMIN_EMAIL ?? "").toLowerCase() &&
-      password === process.env.ADMIN_PASSWORD
-    ) {
+    const email = rawEmail.toLowerCase();
+
+    // --- Admin Girişi ---
+    if (email === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
       const token = await new SignJWT({
         userId: "1",
-        email: email.toLowerCase(),
+        email,
         role: "admin",
         businessId: null,
       })
@@ -34,12 +41,12 @@ export async function POST(request: NextRequest) {
 
       const response = NextResponse.json({
         success: true,
-        message: "Admin girişi başarılı",
+        message: "Admin girişi başarılı.",
         user: {
           id: "1",
           firstName: "Admin",
           lastName: "User",
-          email: email.toLowerCase(),
+          email,
           role: "admin",
           businessId: null,
         },
@@ -49,41 +56,40 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
+        maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60, // saniye
+        path: "/",
       });
 
       return response;
     }
 
-    // Veritabanına bağlan
+    // --- Kullanıcı Girişi ---
     const { db } = await connectToDatabase();
 
-    // Kullanıcıyı email ile ara (küçük harf)
-    const user = await db.collection("users").findOne({
-      email: email.toLowerCase(),
-    });
+    // Kullanıcıyı email ile bul
+    const user = await db.collection("users").findOne({ email });
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre" },
+        { success: false, error: "Geçersiz e-posta veya şifre." },
         { status: 401 }
       );
     }
 
-    // Şifreyi doğrula
+    // Şifre kontrolü
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre" },
+        { success: false, error: "Geçersiz e-posta veya şifre." },
         { status: 401 }
       );
     }
 
-    // Hesap aktif mi kontrol et
+    // Hesap aktif mi?
     if (!user.isActive) {
       return NextResponse.json(
-        { success: false, error: "Hesabınız askıya alınmıştır" },
+        { success: false, error: "Hesabınız askıya alınmıştır." },
         { status: 403 }
       );
     }
@@ -102,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      message: "Giriş başarılı",
+      message: "Giriş başarılı.",
       user: {
         id: user._id.toString(),
         firstName: user.firstName,
@@ -113,19 +119,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Cookie ayarla
+    // HttpOnly cookie olarak tokenı ayarla
     response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
+      path: "/",
     });
 
     return response;
-  } catch (error) {
-    console.error("Login error:", error);
+  } catch (error: any) {
+    console.error("Login error:", error?.message || error);
     return NextResponse.json(
-      { success: false, error: "Giriş yapılırken bir hata oluştu" },
+      {
+        success: false,
+        error: "Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin.",
+      },
       { status: 500 }
     );
   }
