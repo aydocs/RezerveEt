@@ -7,29 +7,31 @@ const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB;
 
 if (!uri) {
-  throw new Error("MONGODB_URI environment variable is not set");
+  throw new Error("❌ MONGODB_URI environment variable is not set.");
 }
 
 if (!dbName) {
-  throw new Error("MONGODB_DB environment variable is not set");
+  throw new Error("❌ MONGODB_DB environment variable is not set.");
 }
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
-  if (client && db) {
+  if (client && db) return { client, db };
+
+  try {
+    client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+
+    await client.connect();
+    db = client.db(dbName);
+    console.log("✅ MongoDB bağlantısı kuruldu.");
     return { client, db };
+  } catch (err) {
+    console.error("❌ MongoDB bağlantı hatası:", err);
+    throw new Error("MongoDB bağlantı hatası.");
   }
-
-  client = new MongoClient(uri, {
-    maxPoolSize: 10,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  });
-
-  await client.connect();
-
-  db = client.db(dbName);
-
-  return { client, db };
 }
 
 export async function closeDatabaseConnection() {
@@ -37,6 +39,7 @@ export async function closeDatabaseConnection() {
     await client.close();
     client = null;
     db = null;
+    console.log("🔌 MongoDB bağlantısı kapatıldı.");
   }
 }
 
@@ -103,9 +106,9 @@ export async function createIndexes() {
     await db.collection("reviews").createIndex({ rating: 1 });
     await db.collection("reviews").createIndex({ createdAt: -1 });
 
-    console.log("Database indexes created successfully");
-  } catch (error) {
-    console.error("Error creating indexes:", error);
+    console.log("✅ Veritabanı indeksleri başarıyla oluşturuldu.");
+  } catch (err) {
+    console.error("❌ İndeks oluşturma hatası:", err);
   }
 }
 
@@ -122,22 +125,6 @@ export async function findBusinesses(filters: {
   return [];
 }
 
-export async function createReservation(reservationData: Partial<any>) {
-  // TODO: Rezervasyon oluşturma ve çakışma kontrolü
-}
+export async function createReservation(reservationData: Partial<any>) {}
 
-export async function updateBusinessRating(businessId: string) {
-  // TODO: İşletmenin ortalama puanını güncelle
-}
-
-// ✅ Eksik olan sağlık kontrolü fonksiyonu eklendi
-export async function checkDatabaseHealth(): Promise<boolean> {
-  try {
-    const { db } = await connectToDatabase();
-    await db.command({ ping: 1 });
-    return true;
-  } catch (error) {
-    console.error("Veritabanı sağlık kontrolü başarısız:", error);
-    return false;
-  }
-}
+export async function updateBusinessRating(businessId: string) {}

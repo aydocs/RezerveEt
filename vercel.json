@@ -13,7 +13,7 @@
 
     "JWT_SECRET": "Ahj32jhsda8723ydas8dhasd823hdas8dhas",
     "NEXTAUTH_SECRET": "Ahj32jhsda8723ydas8dhasd823hdas8dhas",
-    "NEXTAUTH_URL": "http://localhost:3000",
+    "NEXTAUTH_URL": "https://rezerve-et.vercel.app",
 
     "SMTP_HOST": "smtp.gmail.com",
     "SMTP_PORT": "587",
@@ -28,7 +28,7 @@
     "TWILIO_AUTH_TOKEN": "your-twilio-auth-token",
     "TWILIO_PHONE_NUMBER": "+1234567890",
 
-    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_APP_URL": "https://rezerve-et.vercel.app",
     "NEXT_PUBLIC_APP_NAME": "RezerveEt",
     "NODE_ENV": "development",
 
