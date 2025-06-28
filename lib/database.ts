@@ -19,7 +19,6 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
     return { client, db };
   }
 
-  // MongoClient oluşturuluyor. TLS ayarı burada belirtilmiyor, URI zaten handle eder.
   client = new MongoClient(uri, {
     maxPoolSize: 10,
     serverSelectionTimeoutMS: 5000,
@@ -41,13 +40,11 @@ export async function closeDatabaseConnection() {
   }
 }
 
-// Collection alma helper fonksiyonu
 export async function getCollection<T = any>(collectionName: string): Promise<Collection<T>> {
   const { db } = await connectToDatabase();
   return db.collection<T>(collectionName);
 }
 
-// Database servis sınıfı
 export class DatabaseService {
   static async findOne<T>(collectionName: string, filter: any): Promise<T | null> {
     const collection = await getCollection<T>(collectionName);
@@ -80,17 +77,14 @@ export class DatabaseService {
   }
 }
 
-// İndeks oluşturma fonksiyonu
 export async function createIndexes() {
   try {
     const { db } = await connectToDatabase();
 
-    // Users
     await db.collection("users").createIndex({ email: 1 }, { unique: true });
     await db.collection("users").createIndex({ phone: 1 });
     await db.collection("users").createIndex({ role: 1 });
 
-    // Businesses
     await db.collection("businesses").createIndex({ slug: 1 }, { unique: true });
     await db.collection("businesses").createIndex({ category: 1 });
     await db.collection("businesses").createIndex({ city: 1 });
@@ -98,14 +92,12 @@ export async function createIndexes() {
     await db.collection("businesses").createIndex({ rating: -1 });
     await db.collection("businesses").createIndex({ isActive: 1 });
 
-    // Reservations
     await db.collection("reservations").createIndex({ businessId: 1 });
     await db.collection("reservations").createIndex({ userId: 1 });
     await db.collection("reservations").createIndex({ date: 1, time: 1 });
     await db.collection("reservations").createIndex({ status: 1 });
     await db.collection("reservations").createIndex({ createdAt: -1 });
 
-    // Reviews
     await db.collection("reviews").createIndex({ businessId: 1 });
     await db.collection("reviews").createIndex({ userId: 1 });
     await db.collection("reviews").createIndex({ rating: 1 });
@@ -117,7 +109,6 @@ export async function createIndexes() {
   }
 }
 
-// Placeholder fonksiyonlar
 export async function findBusinesses(filters: {
   category?: string;
   city?: string;
@@ -137,4 +128,16 @@ export async function createReservation(reservationData: Partial<any>) {
 
 export async function updateBusinessRating(businessId: string) {
   // TODO: İşletmenin ortalama puanını güncelle
+}
+
+// ✅ Eksik olan sağlık kontrolü fonksiyonu eklendi
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    const { db } = await connectToDatabase();
+    await db.command({ ping: 1 });
+    return true;
+  } catch (error) {
+    console.error("Veritabanı sağlık kontrolü başarısız:", error);
+    return false;
+  }
 }
