@@ -19,7 +19,7 @@
     "SMTP_PORT": "587",
     "SMTP_USER": "patakanefe@gmail.com",
     "SMTP_PASS": "wdht mbgb ohgv bfyf",
-    "SMTP_FROM": "noreply@rezerveet.com",
+    "SMTP_FROM": "patakanefe@gmail.com",
 
     "IYZICO_API_KEY": "sandbox-your-api-key",
     "IYZICO_SECRET_KEY": "sandbox-your-secret-key",
@@ -68,7 +68,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://web-rezerve-et-com-clone-lilac.vercel.app"
+          "value": "https://rezerveet.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
