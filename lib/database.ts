@@ -13,8 +13,8 @@ import {
 let client: MongoClient | null = null;
 let db: Db | null = null;
 
-const uri: string = process.env.MONGODB_URI!;
-const dbName: string = process.env.MONGODB_DB!;
+const uri: string = process.env.MONGODB_URI ?? "";
+const dbName: string = process.env.MONGODB_DB ?? "";
 
 if (!uri) throw new Error("❌ MONGODB_URI environment variable is not set.");
 if (!dbName) throw new Error("❌ MONGODB_DB environment variable is not set.");
@@ -53,7 +53,9 @@ export async function closeDatabaseConnection() {
 /**
  * Belirtilen koleksiyonu döner
  */
-export async function getCollection<T extends Document = Document>(collectionName: string): Promise<Collection<T>> {
+export async function getCollection<T extends Document = Document>(
+  collectionName: string
+): Promise<Collection<T>> {
   const { db } = await connectToDatabase();
   return db.collection<T>(collectionName);
 }
@@ -157,15 +159,15 @@ export async function createIndexes() {
 }
 
 /**
- * İşletmeleri filtreleyerek getirir (arama, kategori, şehir, lokasyon, değerlendirme, fiyat aralığı, pagination)
+ * İşletmeleri filtreleyerek getirir
  */
 export async function findBusinesses(filters: {
   category?: string;
   city?: string;
   search?: string;
-  location?: { lat: number; lng: number; radius: number }; // radius metre cinsinden
+  location?: { lat: number; lng: number; radius: number }; // metre cinsinden radius
   rating?: number;
-  priceRange?: string[]; // örn: ["₺", "₺₺"]
+  priceRange?: string[];
   limit?: number;
   offset?: number;
 }): Promise<WithId<Document>[]> {
@@ -194,7 +196,7 @@ export async function findBusinesses(filters: {
       $geoWithin: {
         $centerSphere: [
           [filters.location.lng, filters.location.lat],
-          filters.location.radius / 6378137, // metre to radian (Dünya yarıçapı)
+          filters.location.radius / 6378137, // metre -> radyan
         ],
       },
     };
@@ -227,11 +229,10 @@ export async function createReservation(reservationData: Partial<Document>) {
 }
 
 /**
- * İşletmenin puan ortalamasını yorumlar bazında günceller
+ * İşletmenin ortalama puanını yorumlar bazında günceller
  */
 export async function updateBusinessRating(businessId: string) {
   const { db } = await connectToDatabase();
-
   const businessObjectId = new ObjectId(businessId);
 
   const reviewsCollection = db.collection("reviews");
@@ -250,6 +251,7 @@ export async function updateBusinessRating(businessId: string) {
     .toArray();
 
   const avgRating = aggregation.length > 0 ? aggregation[0].avgRating : 0;
+  const reviewCount = aggregation.length > 0 ? aggregation[0].count : 0;
 
   const businessesCollection = db.collection("businesses");
   await businessesCollection.updateOne(
@@ -257,7 +259,7 @@ export async function updateBusinessRating(businessId: string) {
     {
       $set: {
         rating: Math.round(avgRating * 10) / 10,
-        reviewCount: aggregation.length > 0 ? aggregation[0].count : 0,
+        reviewCount,
         updatedAt: new Date(),
       },
     }

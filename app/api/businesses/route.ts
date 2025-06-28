@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/database";
 
+interface BusinessRequestBody {
+  name: string;
+  category: string;
+  description: string;
+  phone: string;
+  email: string;
+  city: string;
+  [key: string]: any;
+}
+
 export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
@@ -8,17 +18,14 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const category = url.searchParams.get("category");
     const city = url.searchParams.get("city");
-    const limit = Number(url.searchParams.get("limit")) || 20;
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? Math.min(Number(limitParam), 100) : 20; // max 100 limit
 
-    const query: any = { status: "approved" };
+    const query: Record<string, any> = { status: "approved" };
     if (category) query.category = category;
     if (city) query.city = city;
 
-    const businesses = await db
-      .collection("businesses")
-      .find(query)
-      .limit(limit)
-      .toArray();
+    const businesses = await db.collection("businesses").find(query).limit(limit).toArray();
 
     return NextResponse.json({ success: true, data: businesses, total: businesses.length });
   } catch (error) {
@@ -33,8 +40,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { db } = await connectToDatabase();
-    const body = await request.json();
+    const body: BusinessRequestBody = await request.json();
 
+    // Zorunlu alanlar kontrolü
     const requiredFields = ["name", "category", "description", "phone", "email", "city"];
     for (const field of requiredFields) {
       if (!body[field]) {
@@ -45,11 +53,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // Slug oluştur
+    // Slug oluşturma
     const slug = body.name
       .toLowerCase()
+      .trim()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
+
+    const now = new Date();
 
     const newBusiness = {
       ...body,
@@ -58,8 +69,8 @@ export async function POST(request: Request) {
       isVerified: false,
       rating: 0,
       reviewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     const result = await db.collection("businesses").insertOne(newBusiness);
