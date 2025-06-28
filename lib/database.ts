@@ -19,6 +19,9 @@ const dbName: string = process.env.MONGODB_DB!;
 if (!uri) throw new Error("❌ MONGODB_URI environment variable is not set.");
 if (!dbName) throw new Error("❌ MONGODB_DB environment variable is not set.");
 
+/**
+ * MongoDB bağlantısını yönetir (singleton pattern)
+ */
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
   if (client && db) return { client, db };
 
@@ -35,6 +38,9 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
   return { client, db };
 }
 
+/**
+ * MongoDB bağlantısını kapatır
+ */
 export async function closeDatabaseConnection() {
   if (client) {
     await client.close();
@@ -44,12 +50,17 @@ export async function closeDatabaseConnection() {
   }
 }
 
+/**
+ * Belirtilen koleksiyonu döner
+ */
 export async function getCollection<T extends Document = Document>(collectionName: string): Promise<Collection<T>> {
   const { db } = await connectToDatabase();
   return db.collection<T>(collectionName);
 }
 
-// Tip koruyucu (Type Guard) fonksiyon
+/**
+ * Güncelleme objesinin MongoDB update operatörü içerip içermediğini kontrol eder
+ */
 function isUpdateFilter<T>(obj: any): obj is UpdateFilter<T> {
   if (typeof obj !== "object" || obj === null) return false;
 
@@ -60,6 +71,9 @@ function isUpdateFilter<T>(obj: any): obj is UpdateFilter<T> {
   return updateOperators.some(op => Object.prototype.hasOwnProperty.call(obj, op));
 }
 
+/**
+ * Genel MongoDB CRUD servis sınıfı
+ */
 export class DatabaseService {
   static async findOne<T extends Document>(
     collectionName: string,
@@ -107,7 +121,9 @@ export class DatabaseService {
   }
 }
 
-// Veritabanı indexleri oluşturma fonksiyonu
+/**
+ * Veritabanı indexleri oluşturma fonksiyonu
+ */
 export async function createIndexes() {
   try {
     const { db } = await connectToDatabase();
@@ -149,7 +165,7 @@ export async function findBusinesses(filters: {
   search?: string;
   location?: { lat: number; lng: number; radius: number }; // radius metre cinsinden
   rating?: number;
-  priceRange?: string[]; // örn: ["$", "$$"]
+  priceRange?: string[]; // örn: ["₺", "₺₺"]
   limit?: number;
   offset?: number;
 }): Promise<WithId<Document>[]> {
@@ -178,7 +194,7 @@ export async function findBusinesses(filters: {
       $geoWithin: {
         $centerSphere: [
           [filters.location.lng, filters.location.lat],
-          filters.location.radius / 6378137, // radius / dünya yarıçapı (metre to radian)
+          filters.location.radius / 6378137, // metre to radian (Dünya yarıçapı)
         ],
       },
     };
@@ -211,7 +227,7 @@ export async function createReservation(reservationData: Partial<Document>) {
 }
 
 /**
- * İşletmenin puan ortalamasını rezervasyonlar ve yorumlar bazında günceller
+ * İşletmenin puan ortalamasını yorumlar bazında günceller
  */
 export async function updateBusinessRating(businessId: string) {
   const { db } = await connectToDatabase();
@@ -222,7 +238,7 @@ export async function updateBusinessRating(businessId: string) {
 
   const aggregation = await reviewsCollection
     .aggregate([
-      { $match: { businessId: businessObjectId } },
+      { $match: { businessId: businessObjectId, isVisible: true } },
       {
         $group: {
           _id: "$businessId",
@@ -238,7 +254,13 @@ export async function updateBusinessRating(businessId: string) {
   const businessesCollection = db.collection("businesses");
   await businessesCollection.updateOne(
     { _id: businessObjectId },
-    { $set: { rating: avgRating } }
+    {
+      $set: {
+        rating: Math.round(avgRating * 10) / 10,
+        reviewCount: aggregation.length > 0 ? aggregation[0].count : 0,
+        updatedAt: new Date(),
+      },
+    }
   );
 
   return avgRating;
