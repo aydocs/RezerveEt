@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { AuthService } from "@/lib/auth-service";
+import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/database";
-import { sendVerificationEmail } from "@/lib/email-service";
+import { sendVerificationEmail } from "@/lib/email-service"; // Bu fonksiyonu kendin implement etmelisin
 
 export async function POST(request: NextRequest) {
   try {
     const { firstName, lastName, email, phone, password, role = "user" } = await request.json();
 
-    // Validation
+    // Basit validation
     if (!firstName || !lastName || !email || !password) {
       return NextResponse.json(
         { success: false, error: "Tüm alanlar zorunludur" },
@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // DB bağlantısı
     const { db } = await connectToDatabase();
 
-    // E-posta kontrolü (case-insensitive)
+    // Email zaten kayıtlı mı?
     const existingUser = await db.collection("users").findOne({
       email: email.toLowerCase(),
     });
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Şifreyi hashle
-    const hashedPassword = await AuthService.hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // Yeni kullanıcı objesi
     const newUser = {
@@ -56,14 +57,13 @@ export async function POST(request: NextRequest) {
 
     const result = await db.collection("users").insertOne(newUser);
 
-    // Doğrulama e-postası gönder
+    // Doğrulama e-postası gönder (async hata yakalama yapabilirsin)
     await sendVerificationEmail(email, result.insertedId.toString());
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          "Hesabınız başarıyla oluşturuldu. E-posta adresinize doğrulama linki gönderildi.",
+        message: "Hesabınız başarıyla oluşturuldu. E-posta adresinize doğrulama linki gönderildi.",
         user: {
           id: result.insertedId,
           firstName,
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Registration error:", error);
+  } catch (error: any) {
+    console.error("Registration error:", error.message || error);
     return NextResponse.json(
       { success: false, error: "Kayıt olurken bir hata oluştu" },
       { status: 500 }
