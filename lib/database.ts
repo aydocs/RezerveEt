@@ -1,10 +1,20 @@
-import { MongoClient, type Db, type Collection, type Filter, type UpdateFilter } from "mongodb";
+import {
+  MongoClient,
+  type Db,
+  type Collection,
+  type Filter,
+  type UpdateFilter,
+  type Document,
+  type WithId,
+  type OptionalUnlessRequiredId,
+  ObjectId,
+} from "mongodb";
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB;
+const uri: string = process.env.MONGODB_URI!;
+const dbName: string = process.env.MONGODB_DB!;
 
 if (!uri) throw new Error("❌ MONGODB_URI environment variable is not set.");
 if (!dbName) throw new Error("❌ MONGODB_DB environment variable is not set.");
@@ -34,47 +44,64 @@ export async function closeDatabaseConnection() {
   }
 }
 
-export async function getCollection<T = any>(collectionName: string): Promise<Collection<T>> {
+export async function getCollection<T extends Document = Document>(collectionName: string): Promise<Collection<T>> {
   const { db } = await connectToDatabase();
   return db.collection<T>(collectionName);
 }
 
+// Tip koruyucu (Type Guard) fonksiyon
+function isUpdateFilter<T>(obj: any): obj is UpdateFilter<T> {
+  if (typeof obj !== "object" || obj === null) return false;
+
+  const updateOperators = [
+    "$set", "$inc", "$unset", "$push", "$pull", "$addToSet", "$currentDate",
+    "$rename", "$min", "$max", "$mul", "$pop", "$bit", "$each"
+  ];
+  return updateOperators.some(op => Object.prototype.hasOwnProperty.call(obj, op));
+}
+
 export class DatabaseService {
-  static async findOne<T>(collectionName: string, filter: Filter<T>): Promise<T | null> {
+  static async findOne<T extends Document>(
+    collectionName: string,
+    filter: Filter<T>
+  ): Promise<WithId<T> | null> {
     const collection = await getCollection<T>(collectionName);
     return collection.findOne(filter);
   }
 
-  static async findMany<T>(
+  static async findMany<T extends Document>(
     collectionName: string,
     filter: Filter<T> = {},
     options: Parameters<Collection<T>["find"]>[1] = {}
-  ): Promise<T[]> {
+  ): Promise<WithId<T>[]> {
     const collection = await getCollection<T>(collectionName);
     return collection.find(filter, options).toArray();
   }
 
-  static async insertOne<T>(collectionName: string, document: T) {
+  static async insertOne<T extends Document>(
+    collectionName: string,
+    document: OptionalUnlessRequiredId<T>
+  ) {
     const collection = await getCollection<T>(collectionName);
     return collection.insertOne(document);
   }
 
-  static async updateOne<T>(
+  static async updateOne<T extends Document>(
     collectionName: string,
     filter: Filter<T>,
     update: UpdateFilter<T> | Partial<T>
   ) {
     const collection = await getCollection<T>(collectionName);
-    const updateDoc = "$set" in update ? update : { $set: update };
+    const updateDoc = isUpdateFilter<T>(update) ? update : { $set: update };
     return collection.updateOne(filter, updateDoc);
   }
 
-  static async deleteOne<T>(collectionName: string, filter: Filter<T>) {
+  static async deleteOne<T extends Document>(collectionName: string, filter: Filter<T>) {
     const collection = await getCollection<T>(collectionName);
     return collection.deleteOne(filter);
   }
 
-  static async count<T>(collectionName: string, filter: Filter<T> = {}) {
+  static async count<T extends Document>(collectionName: string, filter: Filter<T> = {}) {
     const collection = await getCollection<T>(collectionName);
     return collection.countDocuments(filter);
   }
@@ -125,7 +152,7 @@ export async function findBusinesses(filters: {
   priceRange?: string[]; // örn: ["$", "$$"]
   limit?: number;
   offset?: number;
-}): Promise<any[]> {
+}): Promise<WithId<Document>[]> {
   const { db } = await connectToDatabase();
   const collection = db.collection("businesses");
 
@@ -168,8 +195,8 @@ export async function findBusinesses(filters: {
 /**
  * Yeni rezervasyon oluşturur
  */
-export async function createReservation(reservationData: Partial<any>) {
-  const collection = (await getCollection("reservations"));
+export async function createReservation(reservationData: Partial<Document>) {
+  const collection = await getCollection("reservations");
   const now = new Date();
 
   const reservation = {
@@ -189,26 +216,28 @@ export async function createReservation(reservationData: Partial<any>) {
 export async function updateBusinessRating(businessId: string) {
   const { db } = await connectToDatabase();
 
-  // Ortalama puan hesaplamak için reviews koleksiyonundan hesaplama yapalım
+  const businessObjectId = new ObjectId(businessId);
+
   const reviewsCollection = db.collection("reviews");
 
-  const aggregation = await reviewsCollection.aggregate([
-    { $match: { businessId } },
-    {
-      $group: {
-        _id: "$businessId",
-        avgRating: { $avg: "$rating" },
-        count: { $sum: 1 },
+  const aggregation = await reviewsCollection
+    .aggregate([
+      { $match: { businessId: businessObjectId } },
+      {
+        $group: {
+          _id: "$businessId",
+          avgRating: { $avg: "$rating" },
+          count: { $sum: 1 },
+        },
       },
-    },
-  ]).toArray();
+    ])
+    .toArray();
 
   const avgRating = aggregation.length > 0 ? aggregation[0].avgRating : 0;
 
-  // İşletme koleksiyonunda güncelle
   const businessesCollection = db.collection("businesses");
   await businessesCollection.updateOne(
-    { _id: businessId },
+    { _id: businessObjectId },
     { $set: { rating: avgRating } }
   );
 

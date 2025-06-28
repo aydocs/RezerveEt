@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
-import { connectToDatabase } from "@/lib/database";
+import { DatabaseService } from "@/lib/database";
 
-const secretKey = process.env.JWT_SECRET ?? "dev-secret";
-const secret = new TextEncoder().encode(secretKey);
+const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret");
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,17 +14,25 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { success: false, error: "E-posta ve şifre gereklidir" },
+        { success: false, error: "E-posta ve şifre gereklidir." },
         { status: 400 }
       );
     }
 
-    const adminEmail = (process.env.ADMIN_EMAIL ?? "").toLowerCase();
+    // ✅ ADMIN GİRİŞİ
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (email === adminEmail && password === adminPassword) {
+    if (email === adminEmail) {
+      if (password !== adminPassword) {
+        return NextResponse.json(
+          { success: false, error: "Şifre yanlış." },
+          { status: 401 }
+        );
+      }
+
       const token = await new SignJWT({
-        userId: "1",
+        userId: "admin",
         email,
         role: "admin",
         businessId: null,
@@ -37,9 +44,9 @@ export async function POST(request: NextRequest) {
 
       const response = NextResponse.json({
         success: true,
-        message: "Admin girişi başarılı",
+        message: "Admin girişi başarılı.",
         user: {
-          id: "1",
+          id: "admin",
           firstName: "Admin",
           lastName: "User",
           email,
@@ -52,34 +59,38 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
+        path: "/",
         maxAge: rememberMe ? 30 * 86400 : 86400,
       });
 
       return response;
     }
 
-    const { db } = await connectToDatabase();
-    const user = await db.collection("users").findOne({ email });
+    // ✅ BUSINESS & USER GİRİŞİ
+    let user =
+      await DatabaseService.findOne<any>("businesses", { email }) ??
+      await DatabaseService.findOne<any>("users", { email });
+
+    const role = user?.role ?? "user";
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre" },
-        { status: 401 }
+        { success: false, error: "E-posta adresi bulunamadı." },
+        { status: 404 }
       );
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
-
     if (!isValidPassword) {
       return NextResponse.json(
-        { success: false, error: "Geçersiz e-posta veya şifre" },
+        { success: false, error: "Şifre yanlış." },
         { status: 401 }
       );
     }
 
     if (!user.isActive) {
       return NextResponse.json(
-        { success: false, error: "Hesabınız askıya alınmıştır" },
+        { success: false, error: "Hesabınız askıya alınmış." },
         { status: 403 }
       );
     }
@@ -87,8 +98,8 @@ export async function POST(request: NextRequest) {
     const token = await new SignJWT({
       userId: user._id.toString(),
       email: user.email,
-      role: user.role,
-      businessId: user.businessId ?? null,
+      role,
+      businessId: role === "business" ? user._id.toString() : user.businessId ?? null,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
@@ -97,14 +108,14 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      message: "Giriş başarılı",
+      message: "Giriş başarılı.",
       user: {
         id: user._id.toString(),
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.role,
-        businessId: user.businessId ?? null,
+        role,
+        businessId: role === "business" ? user._id.toString() : user.businessId ?? null,
       },
     });
 
@@ -112,12 +123,13 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      path: "/",
       maxAge: rememberMe ? 30 * 86400 : 86400,
     });
 
     return response;
   } catch (error: any) {
-    console.error("Login error:", error?.message || error);
+    console.error("Login error:", error);
     return NextResponse.json(
       { success: false, error: "Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin." },
       { status: 500 }
