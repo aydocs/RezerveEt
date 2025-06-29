@@ -267,3 +267,19 @@ export async function updateBusinessRating(businessId: string) {
 
   return avgRating;
 }
+
+/**
+ * Database sağlık kontrolü fonksiyonu
+ */
+export async function checkDatabaseHealth() {
+  try {
+    const { client, db } = await connectToDatabase();
+
+    // MongoDB ping komutu ile bağlantı testi
+    await db.command({ ping: 1 });
+
+    return { status: "ok" };
+  } catch (error) {
+    return { status: "error", message: (error as Error).message };
+  }
+}

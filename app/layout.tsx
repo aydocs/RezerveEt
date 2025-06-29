@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -8,7 +9,6 @@ export const metadata: Metadata = {
   keywords: ['rezervasyon', 'online rezervasyon', 'masa ayırt', 'rezerve et', 'restoran rezervasyon'],
   authors: [{ name: 'Aydocs', url: 'https://github.com/aydocs' }],
   creator: 'Aydocs',
-  // viewport alanı metadata içinde değil, ayrı export olarak:
 };
 
 export function generateViewport() {
@@ -20,6 +20,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="tr">
+      <head>
+        <meta name="viewport" content={generateViewport()} />
+      </head>
       <body>{children}</body>
     </html>
   );
